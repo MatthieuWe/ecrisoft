@@ -20,6 +20,46 @@ CREATE SEQUENCE seq_mandats;
 CREATE SEQUENCE seq_qualifications;
 CREATE SEQUENCE seq_collaborateurs;
 
+-- fonctions controle de types
+CREATE OR REPLACE FUNCTION f_is_str_of_type(p_col IN VARCHAR2,
+									p_type IN VARCHAR2)
+RETURN BOOLEAN
+IS
+	is_of_type BOOLEAN := True;
+BEGIN
+	-- dans un IF car on implementera pt aussi normalizedString plus tard
+	IF (UPPER(p_type) = 'TOKEN'	OR UPPER(p_type) = 'WORD') THEN
+	-- caracteres de controle, CR-LF 
+		FOR i IN 1..Length(p_col) LOOP
+			IF (Ascii(Substr(i, 1)) < 32) THEN
+				is_of_type := FALSE;
+			END IF;
+		END LOOP;
+-- plus d'un espace
+		IF (Instr(p_col, '  ') <> 0) THEN
+			is_of_type := FALSE;
+		END IF;
+-- espace au début
+		IF (Substr(p_col, 1, 1) = ' ') THEN
+			is_of_type := FALSE;
+		END IF;
+-- espace à la fin
+		IF (Substr(p_col, Length(p_col), 1) = ' ') THEN
+			is_of_type := FALSE;
+		END IF;
+
+	END IF;
+	-- tous les espaces
+	IF(UPPER(p_type) = 'WORD') THEN
+		IF (Instr(p_col, ' ') <> 0) THEN
+			is_of_type := FALSE;
+		END IF;
+	END IF;
+RETURN is_of_type;
+
+END;
+
+
 -- tables sans FK
 CREATE TABLE personnesmorales(
 	numero NUMBER(10) DEFAULT seq_personnesmorales.Nextval
@@ -27,7 +67,9 @@ CREATE TABLE personnesmorales(
 	raisonsociale VARCHAR2(30) CONSTRAINT nn_pm_raisonsociale NOT NULL,
 	ruenumero VARCHAR2(50) CONSTRAINT nn_pm_ruenumero NOT NULL,
 	codepostal VARCHAR2(4) CONSTRAINT nn_pm_codepostal NOT NULL,
-	localite VARCHAR2(100) CONSTRAINT nn_pm_localite NOT NULL
+	localite VARCHAR2(100) CONSTRAINT nn_pm_localite NOT NULL,
+	CONSTRAINT ch_pm_raisonsociale_token CHECK
+		(f_is_str_of_type(raisonsociale, 'token')
 	);
 
 CREATE TABLE qualifications(
