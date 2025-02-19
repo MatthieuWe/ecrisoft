@@ -109,14 +109,14 @@ RETURN BOOLEAN
 IS
 	is_of_type BOOLEAN := True;
 BEGIN
-	-- dans un IF car on implementera pt aussi normalizedString plus tard
-	IF (UPPER(p_type) = 'TOKEN'	OR UPPER(p_type) = 'WORD') THEN
-	-- caracteres de controle, CR-LF 
-		FOR i IN 1..Length(p_col) LOOP
-			IF (Ascii(Substr(i, 1)) < 32) THEN
-				is_of_type := FALSE;
-			END IF;
-		END LOOP;
+-- caracteres de controle, CR-LF... etc
+	FOR i IN 1..Length(p_col) LOOP
+		IF (Ascii(Substr(i, 1)) < 32) THEN
+			is_of_type := FALSE;
+		END IF;
+	END LOOP;
+		
+	IF (UPPER(p_type) = 'TOKEN') THEN
 -- plus d'un espace
 		IF (Instr(p_col, '  ') <> 0) THEN
 			is_of_type := FALSE;
@@ -129,13 +129,14 @@ BEGIN
 		IF (Substr(p_col, Length(p_col), 1) = ' ') THEN
 			is_of_type := FALSE;
 		END IF;
-
-	END IF;
+		
+	ELSIF(UPPER(p_type) = 'WORD') THEN
 	-- tous les espaces
-	IF(UPPER(p_type) = 'WORD') THEN
 		IF (Instr(p_col, ' ') <> 0) THEN
 			is_of_type := FALSE;
 		END IF;
+	ELSE
+		RAISE_APPLICATION_ERROR(-20003, 'Type possibles: "token", "word"');
 	END IF;
 RETURN is_of_type;
 
@@ -160,6 +161,22 @@ BEGIN
 	IF (NOT f_is_str_of_type(:New.libelle, 'token')) THEN
 		RAISE_APPLICATION_ERROR(-20002, 'Type token requis pour la colonne libelle');
 	END IF;
+END tri_qualifications;
+/
+CREATE OR REPLACE TRIGGER tri_collaborateurs
+	BEFORE INSERT OR UPDATE ON collaborateurs
+	FOR EACH ROW
+IS
+	ex_type_faux EXCEPTION
+BEGIN
+	IF (NOT f_is_str_of_type(:New.mnemo, 'word')
+		OR NOT f_is_str_of_type(:New.nom, 'token')
+		OR NOT f_is_str_of_type(:New.prenom, 'token')) THEN
+			RAISE ex_type_faux;
+	END IF;
+EXCEPTION
+	WHEN ex_type_faux THEN
+		RAISE_APPLICATION_ERROR(-20002, 'Erreur de type textuel');
 END tri_qualifications;
 /
 
