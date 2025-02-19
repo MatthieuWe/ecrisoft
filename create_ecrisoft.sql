@@ -4,7 +4,7 @@ DROP SEQUENCE seq_personnesmorales;
 DROP SEQUENCE seq_mandats;
 DROP SEQUENCE seq_qualifications;
 DROP SEQUENCE seq_collaborateurs;
-
+--Salut les lapins
 DROP TABLE realisations;
 DROP TABLE mandats;
 DROP TABLE collaborateurs;
