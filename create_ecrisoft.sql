@@ -5,7 +5,6 @@ DROP SEQUENCE seq_mandats;
 DROP SEQUENCE seq_qualifications;
 DROP SEQUENCE seq_qual_ordre;
 DROP SEQUENCE seq_collaborateurs;
---Salut les lapins
 DROP TABLE realisations;
 DROP TABLE mandats;
 DROP TABLE collaborateurs;
@@ -155,7 +154,7 @@ END tri_modif_mandat;
 /
 
 CREATE OR REPLACE TRIGGER tri_qualifications
-	BEFORE UPDATE OR INSERT ON qualifications
+	BEFORE INSERT OR UPDATE ON qualifications
 	FOR EACH ROW
 BEGIN
 	IF (NOT f_is_str_of_type(:New.libelle, 'token')) THEN
@@ -165,6 +164,30 @@ END tri_qualifications;
 /
 
 -- Indexes
+
+CREATE INDEX idx_collaborateurs_qual_concerner_numero ON collaborateurs (qual_concerner_numero);
+
+CREATE INDEX idx_mandats_pm_client_numero ON mandats (pm_client_numero);
+CREATE INDEX idx_mandats_col_mandCom_numero ON mandats (col_mandCom_numero);
+CREATE INDEX idx_mandats_col_chefProjet_numero ON mandats (col_chefProjet_numero);
+
+CREATE INDEX idx_personnesmorales_raisonsociale ON personnesmorales (raisonsociale);
+CREATE INDEX idx_personnesmorales_codepostal ON personnesmorales (codepostal);
+CREATE INDEX idx_personnesmorales_localite ON personnesmorales (localite);
+
+CREATE INDEX idx_qualifications_libelle ON qualifications (libelle);
+CREATE INDEX idx_qualifications_tarifhoraire ON qualifications (tarifhoraire);
+
+CREATE INDEX idx_collaborateurs_nom ON collaborateurs (nom);
+CREATE INDEX idx_collaborateurs_prenom ON collaborateurs (prenom);
+
+CREATE INDEX idx_mandats_reference ON mandats (reference);
+CREATE INDEX idx_mandats_dateSignature ON mandats (dateSignature);
+CREATE INDEX idx_mandats_dateDebut ON mandats (dateDebut);
+CREATE INDEX idx_mandats_dateFinPrevue ON mandats (dateFinPrevue);
+CREATE INDEX idx_mandats_dateFinReelle ON mandats (dateFinReelle);
+
+
 
 
 
