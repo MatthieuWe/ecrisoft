@@ -11,10 +11,12 @@ DROP TABLE collaborateurs;
 DROP TABLE personnesmorales;
 DROP TABLE qualifications;
 
+DROP FUNCTION f_is_str_of_type;
+
 DROP TRIGGER tri_modif_mandat;
 DROP TRIGGER tri_qualifications;
-
-DROP FUNCTION f_is_str_of_type;
+DROP TRIGGER tri_personnesmorales;
+DROP TRIGGER tri_mandats;
 */
 
 -- sequences
@@ -42,6 +44,7 @@ CREATE TABLE qualifications(
 	ordre NUMBER (3) DEFAULT seq_qual_ordre.Nextval	CONSTRAINT nn_qual_ordre NOT NULL,
 	libelle VARCHAR2(20) CONSTRAINT nn_qual_libelle NOT NULL,
 	tarifhoraire NUMBER(3) CONSTRAINT nn_qual_tarifhoraire NOT NULL,
+	CONSTRAINT uk_qual_libelle UNIQUE (libelle),
 	CONSTRAINT uk_qual_ordre UNIQUE (ordre),
 	CONSTRAINT ch_qual_tarifhoraire CHECK (tarifhoraire > 0)
 	);
@@ -144,7 +147,7 @@ END f_is_str_of_type;
 /
 
 -- Triggers
-
+--frozen
 CREATE OR REPLACE TRIGGER tri_modif_mandat
 	BEFORE UPDATE ON mandats
 	FOR EACH ROW
@@ -153,7 +156,7 @@ BEGIN
 	RAISE_APPLICATION_ERROR(-20001, 'Modification de PM_CLIENT_NUMERO interdite - Contrainte frozen');
 END tri_modif_mandat;
 /
-
+-- triggers sur types textuels token et word
 CREATE OR REPLACE TRIGGER tri_qualifications
 	BEFORE INSERT OR UPDATE ON qualifications
 	FOR EACH ROW
@@ -163,11 +166,12 @@ BEGIN
 	END IF;
 END tri_qualifications;
 /
+
 CREATE OR REPLACE TRIGGER tri_collaborateurs
 	BEFORE INSERT OR UPDATE ON collaborateurs
 	FOR EACH ROW
-IS
-	ex_type_faux EXCEPTION
+DECLARE
+	ex_type_faux EXCEPTION;
 BEGIN
 	IF (NOT f_is_str_of_type(:New.mnemo, 'word')
 		OR NOT f_is_str_of_type(:New.nom, 'token')
@@ -178,6 +182,40 @@ EXCEPTION
 	WHEN ex_type_faux THEN
 		RAISE_APPLICATION_ERROR(-20002, 'Erreur de type textuel');
 END tri_qualifications;
+/
+
+CREATE OR REPLACE TRIGGER tri_personnesmorales
+	BEFORE INSERT OR UPDATE ON personnesmorales
+	FOR EACH ROW
+DECLARE
+	ex_type_faux EXCEPTION;
+BEGIN
+	IF (NOT f_is_str_of_type(:New.raisonSociale, 'token')
+		OR NOT f_is_str_of_type(:New.rueNumero, 'token')
+		OR NOT f_is_str_of_type(:New.localite, 'token')
+		OR NOT f_is_str_of_type(:New.codePostal, 'word')) THEN
+			RAISE ex_type_faux;
+	END IF;
+EXCEPTION
+	WHEN ex_type_faux THEN
+		RAISE_APPLICATION_ERROR(-20002, 'Erreur de type textuel');
+END tri_personnesmorales;
+/
+
+CREATE OR REPLACE TRIGGER tri_mandats
+	BEFORE INSERT OR UPDATE ON mandats
+	FOR EACH ROW
+DECLARE
+	ex_type_faux EXCEPTION;
+BEGIN
+	IF (NOT f_is_str_of_type(:New.reference, 'word')
+		OR NOT f_is_str_of_type(:New.description, 'token')) THEN
+			RAISE ex_type_faux;
+	END IF;
+EXCEPTION
+	WHEN ex_type_faux THEN
+		RAISE_APPLICATION_ERROR(-20002, 'Erreur de type textuel');
+END tri_mandats;
 /
 
 -- Indexes
@@ -192,13 +230,11 @@ CREATE INDEX idx_personnesmorales_raisonsociale ON personnesmorales (raisonsocia
 CREATE INDEX idx_personnesmorales_codepostal ON personnesmorales (codepostal);
 CREATE INDEX idx_personnesmorales_localite ON personnesmorales (localite);
 
-CREATE INDEX idx_qualifications_libelle ON qualifications (libelle);
 CREATE INDEX idx_qualifications_tarifhoraire ON qualifications (tarifhoraire);
 
 CREATE INDEX idx_collaborateurs_nom ON collaborateurs (nom);
 CREATE INDEX idx_collaborateurs_prenom ON collaborateurs (prenom);
 
-CREATE INDEX idx_mandats_reference ON mandats (reference);
 CREATE INDEX idx_mandats_dateSignature ON mandats (dateSignature);
 CREATE INDEX idx_mandats_dateDebut ON mandats (dateDebut);
 CREATE INDEX idx_mandats_dateFinPrevue ON mandats (dateFinPrevue);
