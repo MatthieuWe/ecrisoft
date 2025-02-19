@@ -3,6 +3,7 @@
 DROP SEQUENCE seq_personnesmorales;
 DROP SEQUENCE seq_mandats;
 DROP SEQUENCE seq_qualifications;
+DROP SEQUENCE seq_qual_ordre;
 DROP SEQUENCE seq_collaborateurs;
 
 DROP TABLE realisations;
@@ -12,53 +13,19 @@ DROP TABLE personnesmorales;
 DROP TABLE qualifications;
 
 DROP TRIGGER tri_modif_mandat;
+DROP TRIGGER tri_qualifications;
+
+DROP FUNCTION f_is_str_of_type;
 */
 
 -- sequences
 CREATE SEQUENCE seq_personnesmorales;
 CREATE SEQUENCE seq_mandats;
 CREATE SEQUENCE seq_qualifications;
+CREATE SEQUENCE seq_qual_ordre
+	INCREMENT BY 10
+	START WITH 10;
 CREATE SEQUENCE seq_collaborateurs;
-
--- fonctions controle de types
-CREATE OR REPLACE FUNCTION f_is_str_of_type(p_col IN VARCHAR2,
-									p_type IN VARCHAR2)
-RETURN BOOLEAN
-IS
-	is_of_type BOOLEAN := True;
-BEGIN
-	-- dans un IF car on implementera pt aussi normalizedString plus tard
-	IF (UPPER(p_type) = 'TOKEN'	OR UPPER(p_type) = 'WORD') THEN
-	-- caracteres de controle, CR-LF 
-		FOR i IN 1..Length(p_col) LOOP
-			IF (Ascii(Substr(i, 1)) < 32) THEN
-				is_of_type := FALSE;
-			END IF;
-		END LOOP;
--- plus d'un espace
-		IF (Instr(p_col, '  ') <> 0) THEN
-			is_of_type := FALSE;
-		END IF;
--- espace au début
-		IF (Substr(p_col, 1, 1) = ' ') THEN
-			is_of_type := FALSE;
-		END IF;
--- espace à la fin
-		IF (Substr(p_col, Length(p_col), 1) = ' ') THEN
-			is_of_type := FALSE;
-		END IF;
-
-	END IF;
-	-- tous les espaces
-	IF(UPPER(p_type) = 'WORD') THEN
-		IF (Instr(p_col, ' ') <> 0) THEN
-			is_of_type := FALSE;
-		END IF;
-	END IF;
-RETURN is_of_type;
-
-END;
-
 
 -- tables sans FK
 CREATE TABLE personnesmorales(
@@ -67,15 +34,13 @@ CREATE TABLE personnesmorales(
 	raisonsociale VARCHAR2(30) CONSTRAINT nn_pm_raisonsociale NOT NULL,
 	ruenumero VARCHAR2(50) CONSTRAINT nn_pm_ruenumero NOT NULL,
 	codepostal VARCHAR2(4) CONSTRAINT nn_pm_codepostal NOT NULL,
-	localite VARCHAR2(100) CONSTRAINT nn_pm_localite NOT NULL,
-	CONSTRAINT ch_pm_raisonsociale_token CHECK
-		(f_is_str_of_type(raisonsociale, 'token')
+	localite VARCHAR2(100) CONSTRAINT nn_pm_localite NOT NULL
 	);
 
 CREATE TABLE qualifications(
 	numero NUMBER(10) DEFAULT seq_qualifications.Nextval
 		CONSTRAINT pk_qualifications PRIMARY KEY,
-	ordre NUMBER (3) CONSTRAINT nn_qual_ordre NOT NULL,
+	ordre NUMBER (3) DEFAULT seq_qual_ordre.Nextval	CONSTRAINT nn_qual_ordre NOT NULL,
 	libelle VARCHAR2(20) CONSTRAINT nn_qual_libelle NOT NULL,
 	tarifhoraire NUMBER(3) CONSTRAINT nn_qual_tarifhoraire NOT NULL,
 	CONSTRAINT uk_qual_ordre UNIQUE (ordre),
@@ -138,6 +103,46 @@ ALTER TABLE mandats
 			REFERENCES collaborateurs
 		);
 
+-- fonctions controle de types
+CREATE OR REPLACE FUNCTION f_is_str_of_type(p_col IN VARCHAR2,
+									p_type IN VARCHAR2)
+RETURN BOOLEAN
+IS
+	is_of_type BOOLEAN := True;
+BEGIN
+	-- dans un IF car on implementera pt aussi normalizedString plus tard
+	IF (UPPER(p_type) = 'TOKEN'	OR UPPER(p_type) = 'WORD') THEN
+	-- caracteres de controle, CR-LF 
+		FOR i IN 1..Length(p_col) LOOP
+			IF (Ascii(Substr(i, 1)) < 32) THEN
+				is_of_type := FALSE;
+			END IF;
+		END LOOP;
+-- plus d'un espace
+		IF (Instr(p_col, '  ') <> 0) THEN
+			is_of_type := FALSE;
+		END IF;
+-- espace au début
+		IF (Substr(p_col, 1, 1) = ' ') THEN
+			is_of_type := FALSE;
+		END IF;
+-- espace à la fin
+		IF (Substr(p_col, Length(p_col), 1) = ' ') THEN
+			is_of_type := FALSE;
+		END IF;
+
+	END IF;
+	-- tous les espaces
+	IF(UPPER(p_type) = 'WORD') THEN
+		IF (Instr(p_col, ' ') <> 0) THEN
+			is_of_type := FALSE;
+		END IF;
+	END IF;
+RETURN is_of_type;
+
+END f_is_str_of_type;
+/
+
 -- Triggers
 
 CREATE OR REPLACE TRIGGER tri_modif_mandat
@@ -146,8 +151,18 @@ CREATE OR REPLACE TRIGGER tri_modif_mandat
 	WHEN (NEW.pm_client_numero <> OLD.pm_client_numero)
 BEGIN
 	RAISE_APPLICATION_ERROR(-20001, 'Modification de PM_CLIENT_NUMERO interdite - Contrainte frozen');
-END;
+END tri_modif_mandat;
+/
 
+CREATE OR REPLACE TRIGGER tri_qualifications
+	BEFORE UPDATE OR INSERT ON qualifications
+	FOR EACH ROW
+BEGIN
+	IF (NOT f_is_str_of_type(:New.libelle, 'token')) THEN
+		RAISE_APPLICATION_ERROR(-20002, 'Type token requis pour la colonne libelle');
+	END IF;
+END tri_qualifications;
+/
 
 -- Indexes
 
